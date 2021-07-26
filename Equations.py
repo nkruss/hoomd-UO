@@ -30,6 +30,38 @@ def get_spring_equations(k0: float, dk: float, w: float, thetas: list):
         equations.append(eq)
     return equations
 
+class Spring_Eq_2:
+    """
+    Spring equations based off of the formula
+        k = k0 * [1 + dk*cos((2pi / N)i - w*t)
+    """
+
+    def __init__(self, k0: float, dk: float, w: float, i: int, N: int, mass=1):
+        self.k0 = k0
+        self.dk = dk
+        #self.w = math.sqrt(self.k0 / mass)
+        self.w = w
+        self.i = i
+        self.N = N
+
+
+    def calc(self, time):
+        """calculates the spring constant value at a specified time from the spring equation, and returns
+        that float number"""
+        return (self.k0 * (1 + (self.dk * math.cos((2 * math.pi * self.i / self.N) - (self.w * time)))))
+
+    def __str__(self):
+        return(f"k = {self.k0}[1 + {self.dk} * cos((2pi / N)i - {self.w}*t)")
+
+
+def get_spring_equations_2(k0: float, dk: float, w: float, N: int):
+    """returns a list of spring equations"""
+    equations = []
+    for i in range(N):
+        eq = Spring_Eq_2(k0, dk, w, i, N)
+        equations.append(eq)
+    return equations
+
 
 class Force_Eq:
 

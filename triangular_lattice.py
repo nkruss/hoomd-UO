@@ -34,6 +34,7 @@ from Simulations import *
 import matplotlib.animation as animation
 import random
 import numpy as np
+import math
 
 class Tri_Lattice(Simulation):
 
@@ -43,7 +44,7 @@ class Tri_Lattice(Simulation):
         self.horizontal_bonds = []
         self.one_fifty_degree_bonds = []
 
-    def create_lattice(self, x: int, y: int, k1:int, k2:int, k3:int, add_periodic_bonds=False, a=1.0, randomized_pos=False, two_D=True):
+    def create_lattice(self, x: int, y: int, k1:int, k2:int, k3:int, add_periodic_bonds_in_y=False, add_periodic_bonds=False, a=1.0, randomized_pos=False, two_D=True):
         """Create a snapshot of a triangular lattice from a hexagonal unitcell, with three different types of bonds
         connecting the particles of the system
 
@@ -69,7 +70,11 @@ class Tri_Lattice(Simulation):
         snap.replicate(x, y, 1)
         snap.bonds.types = ["polymer1", "polymer2", "polymer3"]
 
-        snap.box= hoomd.data.boxdim(Lx=25, Ly=25, Lz=3, dimensions=2)
+        hight = (math.sin(math.pi/3)*20)
+
+        #snap.box= hoomd.data.boxdim(Lx=15, Ly=(math.sin(math.pi/3)*20), Lz=3, dimensions=2)
+
+        snap.box= hoomd.data.boxdim(Lx=15, Ly=(math.sin(math.pi/3)*20), Lz=3, dimensions=2)
 
         if randomized_pos:
             print(snap.box)
@@ -143,7 +148,7 @@ class Tri_Lattice(Simulation):
             counter += 1
 
         # part 3 of adding in the 30 degree bonds, adding in the bonds for periodic boundary conditions
-        if add_periodic_bonds:
+        if add_periodic_bonds or add_periodic_bonds_in_y:
             for particle_i in range((2 * y) - 2, len(self.system.particles) - 2, (2 * y)):
                 self.system.bonds.add("polymer1", self.system.particles[particle_i].tag,
                                       self.system.particles[(particle_i + 3)].tag)
@@ -213,6 +218,15 @@ class Tri_Lattice(Simulation):
                 self.one_fifty_degree_bonds.append((self.system.particles[particle_i].tag,
                                                     self.system.particles[(particle_i + ((2 * x * y) - (2 * y) - 1))].tag))
 
+        if add_periodic_bonds_in_y:
+            for particle_i in range((2 * y) - 2, len(self.system.particles), (2 * y)):
+                self.system.bonds.add("polymer2", self.system.particles[particle_i].tag,
+                                 self.system.particles[particle_i - ((2 * y) - 3)].tag)
+
+                self.one_fifty_degree_bonds.append((self.system.particles[particle_i].tag,
+                                                    self.system.particles[particle_i - ((2 * y) - 3)].tag))
+
+
     def print_bonds(self):
         """Print out lists of the different bonds applied though-out the lattice. Bonds are represented by a tuple of
         the two bonded particle tags
@@ -247,6 +261,32 @@ class Tri_Lattice(Simulation):
                     line += f"p{p.tag}   "
                 f.write(line)
                 self.p_p_recorded = True
+
+    def log_velocity(self, timestep):
+        """Record all particle velocities to a file so that they can be latter be analysed"""
+        if self.p_v_recorded:
+            with open(self.velocity_fname, "a") as f:
+                line = "\n" + str(timestep) + "   "
+                for p in self.system.particles:
+                    velocity = p.velocity
+                    line += str(velocity)
+                    line += "   "
+                f.write(line)
+        else:
+            with open(self.velocity_fname, "w") as f:
+                N = len(self.system.particles)
+                dt = self.dt
+                m = self.m
+                a = self.a
+                x = self.x
+                y = self.y
+                line = f"Simulation particle positions, run dt= {dt} mass= {m} a= {a} x= {x} y= {y} N= {N} \n"
+                f.write(line)
+                line = "timestep   "
+                for p in self.system.particles:
+                    line += f"p{p.tag}   "
+                f.write(line)
+                self.p_v_recorded = True
 
     def graph_p_pos(self, graph_bonds=False):
         """Create a graph of the system, set graph_bonds to True to show the system bonds on the graph

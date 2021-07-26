@@ -34,6 +34,10 @@ class Simulation:
         self.p_k_recorded = False
         self.dt = dt
         self.m = 1
+        self.velocity_fname = "velocities.txt"
+
+        self.k_list = []
+        self.Equation_list = []
         hoomd.context.initialize("")
 
 
@@ -154,7 +158,7 @@ class Simulation:
     def log_velocity(self, timestep):
         """Record all particle velocities to a file so that they can be latter be analysed"""
         if self.p_v_recorded:
-            with open("velocities.txt", "a") as f:
+            with open(self.velocity_fname, "a") as f:
                 line = "\n" + str(timestep) + "   "
                 for p in self.system.particles:
                     velocity = p.velocity
@@ -162,7 +166,7 @@ class Simulation:
                     line += "   "
                 f.write(line)
         else:
-            with open("velocities.txt", "w") as f:
+            with open(self.velocity_fname, "w") as f:
                 N = len(self.system.particles)
                 dt = self.dt
                 m = self.m
@@ -204,7 +208,8 @@ class Simulation:
         self.log_velocity(timestep)
 
     def log_system_kinetic_energy(self, fname: str, period=100):
-        """Record the kinetic energy of the system into a file that can be latter analysed"""
+        """Record the kinetic energy of the system into a file that can be latter analysed, make sure period
+        is the same as the period velocity and positions are being logged"""
         hoomd.analyze.log(filename=fname,
                           quantities=["kinetic_energy"],
                           period=period,
@@ -247,7 +252,7 @@ class Simulation:
         if num == 2:
             self.Eq3 = equation
 
-    def add_dynamic_force(self, equation: "Force_Eq", tag_list: list, Negative=False):
+    def add_dynamic_force(self, equation: "Force_Eq", tag_list: list, Negative=False, dimension="x"):
         """Create a dynamic force and apply it to the system. The dynamic is really a static force with an
         equation relating to it so the magnitude can be updated every timestep"""
 
@@ -263,7 +268,12 @@ class Simulation:
         self.force_eq.append((equation, force_pt))
 
         # set the force
-        self.dynamic_forces.append(hoomd.md.force.constant(fx=f_mag, fy=0, fz=0, group=force_pt))
+        if dimension == "x":
+            self.dynamic_forces.append((hoomd.md.force.constant(fx=f_mag, fy=0, fz=0, group=force_pt), 'x'))
+        elif dimension == "y":
+            self.dynamic_forces.append((hoomd.md.force.constant(fx=0, fy=f_mag, fz=0, group=force_pt), 'y'))
+        elif dimension == "z":
+            self.dynamic_forces.append((hoomd.md.force.constant(fx=0, fy=0, fz=f_mag, group=force_pt), 'z'))
 
         with open("force.txt", "w") as f:
             line = f"Simulation dynamic force \n"
@@ -272,7 +282,6 @@ class Simulation:
             f.write(line)
             f.write("0    " + str(f_mag))
 
-
     def update_dynamic_force(self, time: float, index: int, record: bool):
         """Updates the dynamic force by recalculating the force magnitude and creating a new force
         with the new magnitude to replace the old one
@@ -280,6 +289,7 @@ class Simulation:
         index = the index of the dynamic force that you want to update the magnitude of
 
         """
+
 
         #pull out the stored force equation
         equation = self.force_eq[index][0]
@@ -291,16 +301,20 @@ class Simulation:
         force_pt = self.force_eq[index][1]
 
         #disable the previous force
-        force = self.dynamic_forces[index]
+        force = self.dynamic_forces[index][0]
         hoomd.md.force.constant.disable(force) #disable the previous force to insure it no longer effects the system
 
         #set a new force with the new magnitude in place of the previous one
-        self.dynamic_forces[index] = hoomd.md.force.constant(fx=f_mag, fy=0, fz=0, group=force_pt)
+        if self.dynamic_forces[index][1] == 'x':
+            self.dynamic_forces[index] = (hoomd.md.force.constant(fx=f_mag, fy=0, fz=0, group=force_pt), 'x')
+        elif self.dynamic_forces[index][1] == 'y':
+            self.dynamic_forces[index] = (hoomd.md.force.constant(fx=0, fy=f_mag, fz=0, group=force_pt), 'y')
+        elif self.dynamic_forces[index][1] == 'z':
+            self.dynamic_forces[index] = (hoomd.md.force.constant(fx=0, fy=0, fz=f_mag, group=force_pt), 'z')
 
         with open("force.txt", "a") as f:
             line = "\n" + str(time) + "    " + str(f_mag)
             f.write(line)
-
 
     def force_frequency(self, timestep):
         """Callback function for turning the static forces on a system on and off as a simulation is run"""
@@ -320,6 +334,28 @@ class Simulation:
         all = hoomd.group.all()
         hoomd.dump.gsd(f"{fname}.gsd", period=period, group=all, overwrite=True)
 
+    def cite(self):
+        hoomd.cite.save(file='hoomd.bib')
+
+    def update_dynamic_properties(self, timestep):
+        if (timestep % 100) == 0:
+            self.log_positions(timestep)
+            self.log_velocity(timestep)
+            #print(self.k1)
+
+        real_time = timestep * self.dt
+
+        #update the stiffnesses of the springs if they are dynamic
+        if self.Eq1 is not None:
+            self.k1 = self.Eq1.calc(real_time)
+        if self.Eq2 is not None:
+            self.k2 = self.Eq2.calc(real_time)
+        if self.Eq3 is not None:
+            self.k3 = self.Eq3.calc(real_time)
+        self.harmonic.bond_coeff.set('polymer1', k=self.k1)
+        self.harmonic.bond_coeff.set('polymer2', k=self.k2)
+        self.harmonic.bond_coeff.set('polymer3', k=self.k3)
+
     def run(self, run_time: int, kt=.0001, dt=.0001, callback=None, callback_period=0, quiet=True, dynamic_f_stop=0, record_force=False):
         """ run_time = the number of time steps the simulation should move forward
             kt = temperature in the system (The higher the temature the more energy the system has)
@@ -332,9 +368,11 @@ class Simulation:
 
         # set up the integrator for the run
         if self.first_run:
+            self.kt = kt
+            self.dt = dt
             nl = hoomd.md.nlist.cell()
-            dpd = hoomd.md.pair.dpd(r_cut=1.0, nlist=nl, kT=kt, seed=1)
-            dpd.pair_coeff.set('A', 'A', A=25.0, gamma=1.0)
+            # dpd = hoomd.md.pair.dpd(r_cut=1, nlist=nl, kT=kt, seed=1)
+            # dpd.pair_coeff.set('A', 'A', A=0, gamma=1.0)
             nl.reset_exclusions(exclusions=[])
             hoomd.md.integrate.mode_standard(dt=dt)
             if self.integrate_group is None:
@@ -353,13 +391,74 @@ class Simulation:
                 #hoomd.run((run_time // 1000), quiet=quiet, callback=callback, callback_period=callback_period)
             time_step = hoomd.get_step()
 
+            real_time = time_step * dt
+
             #update the stiffnesses of the springs if they are dynamic
             if self.Eq1 is not None:
-                self.k1 = self.Eq1.calc(time_step)
+                self.k1 = self.Eq1.calc(real_time)
+                self.harmonic.bond_coeff.set('polymer1', k=self.k1)
             if self.Eq2 is not None:
-                self.k2 = self.Eq2.calc(time_step)
+                self.k2 = self.Eq2.calc(real_time)
+                self.harmonic.bond_coeff.set('polymer2', k=self.k2)
             if self.Eq3 is not None:
-                self.k3 = self.Eq3.calc(time_step)
+                self.k3 = self.Eq3.calc(real_time)
+                self.harmonic.bond_coeff.set('polymer3', k=self.k3)
+
+            #update the dynamic force magnitudes untill stop point
+            if i <= dynamic_f_stop:
+                for force_i in range (len(self.dynamic_forces)):
+                    self.update_dynamic_force(real_time, force_i, record_force)
+            if i == dynamic_f_stop+1:
+                for force in self.dynamic_forces:
+                    hoomd.md.force.constant.disable(force)
+                #print(time_step)
+
+            end = time.time()
+        print(f"\nsimulation took {round((end - start), 5)} secs to run")
+
+    def run_langevin(self, run_time: int, kt=.0001, dt=.0001, gamma=1.0, callback=None, callback_period=0, quiet=True, dynamic_f_stop=0, record_force=False):
+        """ run_time = the number of time steps the simulation should move forward
+            kt = temperature in the system (The higher the temature the more energy the system has)
+            dt = change of time per time step
+            callback = a function to be called periodicly during the run
+            callback_period = the period at chich the callback function is triggered
+
+        > sim.run(50000,callback=sim.force_frequency,callback_period=25000)
+        """
+
+        # set up the integrator for the run
+        if self.first_run:
+            self.kt = kt
+            self.dt = dt
+            nl = hoomd.md.nlist.cell()
+            nl.reset_exclusions(exclusions=[])
+            hoomd.md.integrate.mode_standard(dt=dt)
+            if self.integrate_group is None:
+                self.integrate_group = hoomd.group.all()
+            integrator = hoomd.md.integrate.langevin(group=self.integrate_group,kT=kt, seed=5)
+            integrator.set_gamma('A', gamma)
+            self.first_run = False
+
+        start = time.time()
+        for i in range(run_time):
+        #for i in range(1000):
+
+            if callback is None:
+                hoomd.run((run_time // 1000), quiet=quiet)
+            else:
+                hoomd.run((1), quiet=quiet, callback=callback, callback_period=callback_period)
+                #hoomd.run((run_time // 1000), quiet=quiet, callback=callback, callback_period=callback_period)
+            time_step = hoomd.get_step()
+
+            real_time = time_step * dt
+
+            #update the stiffnesses of the springs if they are dynamic
+            if self.Eq1 is not None:
+                self.k1 = self.Eq1.calc(real_time)
+            if self.Eq2 is not None:
+                self.k2 = self.Eq2.calc(real_time)
+            if self.Eq3 is not None:
+                self.k3 = self.Eq3.calc(real_time)
             self.harmonic.bond_coeff.set('polymer1', k=self.k1)
             self.harmonic.bond_coeff.set('polymer2', k=self.k2)
             self.harmonic.bond_coeff.set('polymer3', k=self.k3)
@@ -377,7 +476,17 @@ class Simulation:
             end = time.time()
         print(f"\nsimulation took {round((end - start), 5)} secs to run")
 
-    def run_langevin(self, run_time: int, kt=.0001, dt=.0001, callback=None, callback_period=0, quiet=True, dynamic_f_stop=0, record_force=False):
+    def run_variable_bonds(self,
+                            run_time: int,
+                            kt = .0001,
+                            dt = .0001,
+                            gamma = 1.0,
+                            callback = None,
+                            callback_period = 0,
+                            quiet = True,
+                            dynamic_f_stop = 0,
+                            record_force = False,
+                            alt_damp = False):
         """ run_time = the number of time steps the simulation should move forward
             kt = temperature in the system (The higher the temature the more energy the system has)
             dt = change of time per time step
@@ -389,48 +498,50 @@ class Simulation:
 
         # set up the integrator for the run
         if self.first_run:
+            self.kt = kt
+            self.dt = dt
             nl = hoomd.md.nlist.cell()
-            dpd = hoomd.md.pair.dpd(r_cut=1.0, nlist=nl, kT=kt, seed=1)
-            dpd.pair_coeff.set('A', 'A', A=25.0, gamma=1.0)
             nl.reset_exclusions(exclusions=[])
             hoomd.md.integrate.mode_standard(dt=dt)
             if self.integrate_group is None:
                 self.integrate_group = hoomd.group.all()
             integrator = hoomd.md.integrate.langevin(group=self.integrate_group,kT=kt, seed=5)
-            integrator.set_gamma('A', gamma=1)
+            integrator.set_gamma('A', 0)
             self.first_run = False
 
         start = time.time()
+        over_damped = gamma
+
+        #record initial positions and velocities
+        self.log_p_info(0)
         for i in range(run_time):
-        #for i in range(1000):
+
+            if alt_damp:
+                if (i % 1e5) == 0.0:
+                    if gamma == 0:
+                        gamma = over_damped
+                    else:
+                        gamma = 0
+                    integrator.set_gamma('A', gamma)
+            else:
+                if (i == 0):
+                    integrator.set_gamma('A', gamma)
 
             if callback is None:
-                hoomd.run((run_time // 1000), quiet=quiet)
+                hoomd.run(1, quiet=quiet)
             else:
                 hoomd.run((1), quiet=quiet, callback=callback, callback_period=callback_period)
-                #hoomd.run((run_time // 1000), quiet=quiet, callback=callback, callback_period=callback_period)
             time_step = hoomd.get_step()
 
-            #update the stiffnesses of the springs if they are dynamic
-            if self.Eq1 is not None:
-                self.k1 = self.Eq1.calc(time_step)
-            if self.Eq2 is not None:
-                self.k2 = self.Eq2.calc(time_step)
-            if self.Eq3 is not None:
-                self.k3 = self.Eq3.calc(time_step)
-            self.harmonic.bond_coeff.set('polymer1', k=self.k1)
-            self.harmonic.bond_coeff.set('polymer2', k=self.k2)
-            self.harmonic.bond_coeff.set('polymer3', k=self.k3)
+            real_time = time_step * dt
 
-            #update the dynamic force magnitudes untill stop point
-            if i <= dynamic_f_stop:
-                for force_i in range (len(self.dynamic_forces)):
-                    Time = time_step * dt
-                    self.update_dynamic_force(Time, force_i, record_force)
-            if i == dynamic_f_stop+1:
-                for force in self.dynamic_forces:
-                    hoomd.md.force.constant.disable(force)
-                #print(time_step)
+            #update the stiffnesses of the springs if they are dynamic
+            for Eq_i in range(len(self.Equation_list)):
+                Eq = self.Equation_list[Eq_i]
+                k_value = Eq.calc(real_time)
+                self.k_list[Eq_i] = k_value
+                self.harmonic.bond_coeff.set(f"polymer_{Eq_i}", k=k_value)
+
 
             end = time.time()
         print(f"\nsimulation took {round((end - start), 5)} secs to run")

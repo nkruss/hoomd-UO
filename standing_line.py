@@ -1,22 +1,17 @@
-"""Molecular Dynamic simulation of a line of three particles bounded by different springs
-
-how to get to simulations in terminal get to directory where triangle_lattice.py is stored
-    from spring_line import *
-
-example:
-        simulation = Line()
-        simulation.create_lattice(10, 10, 10, p_mass=.001)
-        simulation.apply_force([0],-10,0,0)
-        simulation.log
-        simulation.run(50000,0)
-        simulation.graph_p_pos()
-"""
-
 from Simulations import *
 
-class Line(Simulation):
+class Standing_Line(Simulation):
 
-    def create_lattice(self, k: int, num_bonds=3, add_periodic_bonds=False, p_mass=1, N=3, a=1):
+    def create_lattice(self,
+                        k: int,
+                        p: int,
+                        num_bonds=3,
+                        add_periodic_bonds=False,
+                        p_mass=1,
+                        N=3,
+                        a=1,
+                        A_p=.2,
+                        B_p=0):
         """Create a snapshot of N particles arranged in a line with bonds connecting each particle to the
         ones next to it in the line """
 
@@ -39,10 +34,14 @@ class Line(Simulation):
         snapshot.particles.mass[:] = mass_list
 
         #set particle positions
+        w_p = 2 * math.sqrt(k / self.m) * math.sin((p * math.pi) / (2 * N))
         pos = -(float(N) / 2)
         pos_list = []
         for p_i in range(N):
-            pos_list.append([pos,0,0])
+            #calculate particle displacement from equilibriam position
+            disp = A_p * math.sin((p * math.pi * p_i) / (N-1)) * math.cos((w_p * 0) + B_p)
+            #disp = 0
+            pos_list.append([pos + disp, 0, 0])
             pos += 1
         snapshot.particles.position[:] = pos_list
 
@@ -87,7 +86,7 @@ class Line(Simulation):
                     counter = 0
             elif num_bonds == 1:
                 self.system.bonds.add('polymer1', 0, (N-1))
-
+        
         self.harmonic = hoomd.md.bond.harmonic()
         self.harmonic.bond_coeff.set('polymer1', k=k, r0=a)
         self.harmonic.bond_coeff.set('polymer2', k=k, r0=a)
