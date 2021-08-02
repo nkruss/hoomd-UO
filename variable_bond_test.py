@@ -40,12 +40,13 @@ def run_sim(num_bonds: int, condition_name: str, alt_damp = False):
     k_0 = 1
     m = 1
     a = 1
-    dk = .18
+    # dk = .18
+    dk = .09
     c_0 = math.sqrt(k_0 / m)
     w = 2 * math.pi * c_0 / num_bonds / a
     #damping = 0.01926
     dt = .0001
-    damping = 0.019175
+    damping = 0.01584
     runtime = int(10000 / .0001)
     #runtime = 100000000
     damp_cond = f"Damping - mag = {damping}, alternating damping = {alt_damp} \n"
@@ -233,7 +234,7 @@ def gsd_analysis(dir_name, dt = 0.0001):
     #target_times = [0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 35]
     data.wave_packet(dt, store_loc = path, plot_title = waterfall_plot_title, num_samples = 10, target_times = target_times)
     #data.gaussian_fitting(dt, store_loc = path, num_samples = 1000, target_times = target_times)
-    data.gaussian_fitting(dt, store_loc = path, num_samples = 1000)
+    #data.gaussian_fitting(dt, store_loc = path, num_samples = 1000)
     data.RMS_error(dt, store_loc = path, plot_title = mean_error_plot_title, num_samples = 1000)
     data.normalized_error(dt, store_loc = path, plot_title = normalized_error_plot_title, num_samples = 1000)
     print("---")
@@ -314,13 +315,30 @@ def integrety_analysis(dir_name, dt = 0.0001):
     plt.clf()
 
 def Gaussian_center_fit_analysis(dt = 0.0001):
+    try:
+        os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Center_All_Data.png"
+        os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Amp_All_Data.png"
+    except:
+        pass
+
     dir_list = ["static_bonds",
                 "8bonds_damp_pt019",
+                "8bonds_damp_pt019175",
                 "8bonds_damp_pt0192",
                 "8bonds_damp_pt01925",
-                "8bonds_damp_pt0195",
                 "8bonds_damp_pt02"]
-    #dir_list = ["8bonds_damp_pt0195"]
+    label_list = ["Static Bonds",
+                "Damping 0.019000",
+                "Damping 0.019175",
+                "Damping 0.019200",
+                "Damping 0.019250",
+                "Damping 0.020000"]
+    # fmt_list = ["k-",
+    #             "m:",
+    #             "g:",
+    #             "b-",
+    #             "g--",
+    #             "m--"]
 
     gaussian_results = []
 
@@ -384,7 +402,7 @@ def Gaussian_center_fit_analysis(dt = 0.0001):
     plt.title("Gaussian Fit Center Position")
     for i in range(len(gaussian_results)):
         data = gaussian_results[i]
-        plt.plot(data[0], data[1], label=dir_list[i])
+        plt.plot(data[0], data[1], label=label_list[i])
         print(f"{dir_list[i]}, speed = {data[2]}")
     plt.legend()
     plt.savefig("Gaussian_Fit_Center_All_Data")
@@ -394,10 +412,16 @@ def Gaussian_center_fit_analysis(dt = 0.0001):
     plt.clf()
     plt.xlabel('Dimensionless Time')
     plt.ylabel('Fit Amplitude Percent Error')
-    plt.title("Gaussian Fit Amp Error")
-    for i in range(len(gaussian_results)):
+    plt.title("Gaussian Fitting Amplitude Error")
+    #plot static trial
+    data = gaussian_results[0]
+    plt.plot(data[0], data[4], c = k, label=label_list[i])
+    #plot rest of the data
+    colors = pl.cm.jet(np.linspace(0,1,len(dir_list) - 1))
+    for i in range(1, len(gaussian_results)):
         data = gaussian_results[i]
-        plt.plot(data[0], data[4], label=dir_list[i])
-    plt.legend()
+        # plt.plot(data[0], data[4], fmt_list[i], label=label_list[i])
+        plt.plot(data[0], data[4], color=colors[i-1], label=label_list[i], cmap="coolwarm")
+    plt.legend(loc = 'upper left', fontsize = 'small')
     plt.savefig("Gaussian_Fit_Amp_All_Data")
     shutil.move("Gaussian_Fit_Amp_All_Data.png", os.getcwd() + f"/aural_metamaterial")
