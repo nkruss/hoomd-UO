@@ -15,6 +15,7 @@ from analysis_files.aural_analysis import *
 sys.path.append('./simulation_files')
 from Equations import *
 from aural_setup import *
+sys.path.append('./..')
 
 #---------------Function to Run Simulation---------------------
 def run_sim(num_bonds: int, condition_name: str):
