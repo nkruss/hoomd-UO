@@ -282,6 +282,10 @@ class Aural_Analysis():
         if store_loc != None:
             plt.savefig("Gaussian_Fits")
             shutil.move("Gaussian_Fits.png", store_loc)
+
+            df = pd.DataFrame({"Dimensionless Time": dimensionless_time, "Amplitude": fit_amp_list, "STD": fit_std_list, "Center": fit_cent_list})
+            df.to_excel("gaussian_fit_parameters.xlsx")
+            shutil.move("gaussian_fit_parameters.xlsx", store_loc)
         else:
             plt.show()
         plt.clf()
@@ -295,22 +299,18 @@ class Aural_Analysis():
         #     df_3.to_excel(writer, sheet_name = "Center")
         # shutil.move("gausian_fit_parameters.xlsx", store_loc)
 
-        df = pd.DataFrame({"Dimensionless Time": dimensionless_time, "Amplitude": fit_amp_list, "STD": fit_std_list, "Center": fit_cent_list})
-        df.to_excel("gaussian_fit_parameters.xlsx")
-        shutil.move("gaussian_fit_parameters.xlsx", store_loc)
-
         #get fit parameter errors
         amp_perc_error_list = []
         std_perc_error_list = []
         for i in range(len(fit_amp_list)):
-            amp_perc_error_list.append((fit_amp_list[i] - fit_amp_list[0]) / fit_amp_list[0] * 100)
+            amp_perc_error_list.append((fit_amp_list[i] - fit_amp_list[0]) / fit_amp_list[0])
             std_perc_error_list.append((fit_std_list[i] - fit_std_list[0]) / fit_std_list[0] * 100)
 
         #create error plots of fit parameters
         g1 = plt.figure(1)
         plt.xlabel('Time')
-        plt.ylabel('Fit Amplitude Percent Error')
-        plt.title("Gaussian Fit Amplitude Error")
+        plt.ylabel('Fit Amplitude Factor')
+        plt.title("Gaussian Fit Amplitude Factor")
         plt.plot(dimensionless_time, amp_perc_error_list)
         if store_loc != None:
             plt.savefig("Gaussian_Fit_Amp")
@@ -572,7 +572,8 @@ class Aural_Analysis():
 
             for time_step_i in range(len(self.particle_data)):
                 time_step = time_step_i * 500
-                if time_step % sample_period == 0:
+                #if time_step % sample_period == 0:
+                if (time_step % sample_period == 0) and (time_step * dt * w > 200):
                     target_index.append(time_step_i)
                     dimensionless_time.append(time_step * dt * w)
             target_index.append(len(self.particle_data) - 1)

@@ -313,10 +313,29 @@ def mathieu():
         a_2.append((4 * ((p * math.pi / 36) ** 2) / (w ** 2)))
     plt.plot(p_list, a_1)
     plt.plot(p_list, a_2)
-    plt.legend(["a = (2 / w)^2 * 2 * (1 - cos(p * pi / 36))", "a = 4 * ((p * pi / 36)^2) / w^2)"])
+
+    #plt.rc(usetex = True)
+    plt.rcParams['text.usetex'] = True
+    plt.plot(p_list, a_2, c='r', label=r'$a = \frac{4(\frac{p\pi}{36})^2 k_0}{w^2 m}$')
+    plt.plot(p_list, a_1, c='b', label=r'$a = (\frac {2}{w})^2 2(1 - \cos{\frac{p\pi}{36}}) \frac{k_0}{m} $')
+    plt.legend(fontsize=14)
     plt.xlabel("p")
     plt.ylabel("w")
     plt.show()
+
+    # import pylab
+    # params = {'backend': 'ps',
+    #       'text.usetex': True}
+    # pylab.rcParams.update(params)
+    # # Plot data
+    # pylab.figure(1)
+    # pylab.clf()
+    # pylab.plot(p_list,a_1,label='$a = \frac {2}{w})^2 2(1 - \cos{\frac{p\pi}{36}}$')
+    # pylab.plot(p_list,a_2,label='$a = \frac{4(\frac{p\pi}{36})^20}{w^2}$')
+    # pylab.xlabel('$p$')
+    # pylab.ylabel('$w$')
+    # pylab.legend()
+    # pylab.savefig('test.png')
 
 
 def data_analysis(data_folder, num_bonds):
