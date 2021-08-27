@@ -11,11 +11,12 @@ import os
 import shutil
 
 from Equations import *
-from aural_analysis import *
+# sys.path.append('./analysis_files')
+from analysis_files.aural_analysis import *
 
-sys.path.append('./simulation_setup')
-from line_variable_bonds import *
-sys.path.append('./..')
+#sys.path.append('./simulation_setup')
+from simulation_files.aural_setup import *
+#sys.path.append('./..')
 
 
 #---------------Function to Run Simulation---------------------
