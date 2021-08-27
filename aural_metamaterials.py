@@ -10,9 +10,11 @@ import numpy as np
 import os
 import shutil
 
-from simulation_files.Equations import *
-from simulation_files.aural_setup import *
 from analysis_files.aural_analysis import *
+
+sys.path.append('./simulation_files')
+from Equations import *
+from aural_setup import *
 
 #---------------Function to Run Simulation---------------------
 def run_sim(num_bonds: int, condition_name: str):
