@@ -82,6 +82,3 @@ class Line(Simulation):
         self.harmonic = hoomd.md.bond.harmonic()
         for i in range(num_bonds):
             self.harmonic.bond_coeff.set(f"polymer_{i}", k=k, r0=a)
-
-        return
-            None
