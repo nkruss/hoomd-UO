@@ -1,29 +1,77 @@
-from triangular_lattice import *
-from spring_line import *
-from random_line import *
-from standing_line import *
-from line_force import *
-from two_mass_rand import *
-from three_mass_rand import *
-from analysis import *
-from Equations import *
-from mpl_toolkits.mplot3d import Axes3D
+"""
+Author - Noah Kruss
+
+File that contains functions for running simulations and preforming analysis on
+a 1D spring mass chain with one of the following conditions
+    - Being forced from one end at a set frequency
+    - Having a 1D standing wave initilized within the chain
+"""
+
+#---------------IMPORT STATEMENTS------------------------------
 import numpy as np
 import os
 import shutil
+import sys
 
-def line_test(num_bonds: int):
-    #known parameters that work are force (2.5), damp (.1), chain (210), time (1000000)
-    #.1 works for damping
+from analysis_files.1D_line_analysis import *
 
-    # force_freq_list = []
-    # freq = 0
-    # while freq < 2.5:
-    #     freq += .1
-    #     force_freq_list.append(freq)
+sys.path.append('./simulation_files')
+from spring_line import *
+from standing_line import *
+from Equations import *
+sys.path.append('./..')
 
-    force_freq_list = [.6]
+#---------------Function to Run Simulation---------------------
+def run_sims(sim_type: str, num_bonds: int):
+    """
+    Function for running simulations
 
+    Inputs:
+        sim_type - (str) identifier of type of simulation to run options are
+                   'force' or 'standing'
+        num_bonds - (int) value for the number of unique types of bonds to make
+                    up the unitcell of the 1D spring mass chain (for a force sim
+                    num_bonds can be 0-3)
+    """
+    #create folders to store data and gsd files
+    main_path = os.getcwd() + f"/1Dline"
+    path = os.getcwd() + f"/1Dline_{num_bonds}bonds"
+    target = main_path + f"/1Dline_{num_bonds}bonds"
+    try:
+        shutil.rmtree(main_path)
+        shutil.rmtree(path)
+    except:
+        pass
+    os.mkdir(main_path, 0o755)
+    os.mkdir(path, 0o755)
+
+    #call apropriate simulation function
+    if sim_type == "force":
+        force_test(num_bonds)
+    elif sim_type == "standing":
+        for p in range(1,35):
+            standing_test(num_bonds, p)
+    else:
+        print("Invalid sim_type")
+
+    #move the simulation data into the tagret directory
+    shutil.move(path, target)
+
+def force_test(num_bonds: int):
+    """
+    Function for setting up and running simulations of a 1D spring mass chain
+    with the rightmost particle pinned in place and the leftmost particle being
+    forced along the x axis at various frequencies
+    """
+
+    #create a list for frequencies to apply a force to the system at
+    force_freq_list = []
+    freq = 0
+    while freq < 2.5:
+        freq += .1
+        force_freq_list.append(freq)
+
+    #for each force frequency
     for freq in force_freq_list:
 
         #add a file with the simulations run conditions
@@ -39,7 +87,9 @@ def line_test(num_bonds: int):
             sim.create_lattice(1, num_bonds=1, add_periodic_bonds=False, N=210)
         else:
             sim.create_lattice(1, num_bonds=num_bonds, add_periodic_bonds=False, N=210)
+        #contrain the system to only move along the x axis
         sim.dimension_constrain([1,0,0])
+        #set up data logging
         sim.create_animation(f"line_test_{num_bonds}bonds_{freq}")
         sim.log_system_kinetic_energy(f"kinetic_{freq}.txt", period=500)
 
@@ -63,8 +113,8 @@ def line_test(num_bonds: int):
             for equation_i in range(len(equations)):
                 sim.change_spring_eq(equation_i, equations[equation_i])
 
+        #run the simulation
         sim.run_langevin(2500000, callback=sim.log_p_info, gamma=.005, callback_period=500, dynamic_f_stop=2500000)
-        #sim.run(1000000, callback=sim.log_p_info, callback_period=500, dynamic_f_stop=1000000)
 
         #store data into folder
         position_file = f"positions_1Dline_{num_bonds}bonds_{freq}.txt"
@@ -75,39 +125,6 @@ def line_test(num_bonds: int):
         shutil.copy(velocity_file, f"1Dline_{num_bonds}bonds")
         shutil.copy(f"line_test_{num_bonds}bonds_{freq}.gsd", f"1Dline_{num_bonds}bonds")
         shutil.copy(f"kinetic_{freq}.txt", f"1Dline_{num_bonds}bonds")
-
-def run_sims():
-    #create folders to store data and gsd files
-    main_path = os.getcwd() + f"/1Dline"
-    try:
-        shutil.rmtree(main_path)
-    except:
-        pass
-    os.mkdir(main_path, 0o755)
-
-    for i in range(1, 2):
-        num_bonds = i
-
-        #create folders to store data and gsd files
-        path = os.getcwd() + f"/1Dline_{num_bonds}bonds"
-        target = main_path + f"/1Dline_{num_bonds}bonds"
-        try:
-            shutil.rmtree(path)
-        except:
-            pass
-        os.mkdir(path, 0o755)
-
-        #run simulation for current number of bonds
-        #line_test(num_bonds)
-
-        test = [7]
-        for p in test:
-            standing_test(num_bonds, p)
-
-        # for p in range(1,35):
-        #     standing_test(num_bonds, p)
-
-        shutil.move(path, target)
 
 def standing_test(num_bonds: int, p: int):
     """
@@ -157,7 +174,6 @@ def standing_test(num_bonds: int, p: int):
             sim.change_spring_eq(equation_i, equations[equation_i])
 
     sim.run(10000000, kt=0, dt=.0001, callback=sim.log_p_info, callback_period=500)
-    #sim.run(50000000, kt=0, dt=.0001, callback=sim.log_p_info, callback_period=500)
 
     #store data into folder
     position_file = f"positions_1Dline_{num_bonds}bonds_p_of_{p}.txt"
@@ -169,8 +185,14 @@ def standing_test(num_bonds: int, p: int):
     shutil.copy(f"line_test_{num_bonds}bonds_p_of_{p}.gsd", f"1Dline_{num_bonds}bonds")
     shutil.copy(f"kinetic_p_of_{p}.txt", f"1Dline_{num_bonds}bonds")
 
-def mathieu():
-    #Solved solution parameters
+def mathieu_tests(w: float, dk: float, k_0: float, p: int):
+    """
+    Function for creating plots of various mathieu function properties for a
+    inputed parameters
+    Inputs:
+        p - (int) number of nodes within the standing wave to be analysised
+    """
+    #---Solved solution parameters---
 
     # # a_2 solution
     # w = .1654983743
@@ -202,24 +224,23 @@ def mathieu():
     # k_0 = 1
     # p = 34
 
-    #p = 2 unstable
-    w = .1711641876
-    dk = .5
-    k_0 = 1
-    p = 2
+    # #p = 2 unstable
+    # w = .1711641876
+    # dk = .5
+    # k_0 = 1
+    # p = 2
 
-    #p = 2 unstable
-    # first w is precise but doesn't seem to fall into unstable
-    w = .2949026294
-    w = .2995382286
-    dk = .5
-    k_0 = 1
-    p = 7
+    # #p = 2 unstable
+    # # first w is precise but doesn't seem to fall into unstable
+    # w = .2949026294
+    # w = .2995382286
+    # dk = .5
+    # k_0 = 1
+    # p = 7
 
+    #-------------Mathieu Stability Plot-------------------
 
-    #----------------------------------------
-
-    ## code for plotting each p value point along the line a = q/gamma
+    #plot each p value point along the line a = q/gamma
     for p in range(36):
         b = math.pi * p / 36
 
@@ -229,18 +250,16 @@ def mathieu():
         plt.scatter(q, a)
         plt.text(q+.03, a, p, fontsize=4)
 
-    #----------------------------------------
-
-    p = 2
-
+    #calculate values for target p value
     b = math.pi * p / 36
-
     gamma = dk / (2 * k_0)
     a = 4 * (b ** 2) * k_0 / (w ** 2)
     q = gamma * a
+
     print(q, a)
     plt.scatter(q, a)
 
+    #Plot the various even and odd Mathieu solution for the given parameter space
     q_values = np.linspace(-10, 100, 1000)
 
     odd_dic = {}
@@ -272,38 +291,13 @@ def mathieu():
 
     plt.xlabel("q")
     plt.ylabel("a")
-    # plt.xlim([0,5])
-    # plt.ylim([0,20])
+    plt.xlim([0,5])
+    plt.ylim([0,20])
     #plt.legend(legend_titles)
     plt.title(f"Mathiue stability plot: w = {w}")
     plt.show()
 
-    # ----------------------------------
-    # Individual mathieu theoretical plot
-    # for p in range(36):
-    #     t = np.linspace(0, 500, 500)
-    #     z = w * t / 2 * (180 / math.pi)
-    #     b = math.pi * p / 36
-    #     gamma = -dk / (2 * k_0)
-    #     a = 4 * (b ** 2) * k_0 / (w ** 2)
-    #     q = gamma * a
-    #
-    #     plt.plot(z, scipy.special.mathieu_cem(m, q, z)[0] - (36 / 2) + 2)
-    #     plt.show()
-
-    t = np.linspace(0, 10000, 1000)
-    z_t = w * t / 2
-    b = math.pi * p / 36
-    gamma = -dk / (2 * k_0)
-    a = 4 * (b ** 2) * k_0 / (w ** 2)
-    q = gamma * a
-
-    plt.plot(z_t, scipy.special.mathieu_cem(1, q, z_t)[0] - (36 / 2) + 2)
-    #plt.plot(t, scipy.special.mathieu_cem(1, -q, z_t)[0] - (36 / 2) + 2)
-    #plt.plot(t, scipy.special.mathieu_sem(1, q, z_t)[0] - (36 / 2) + 2)
-    plt.xlabel("z")
-    plt.ylabel("position")
-    plt.show()
+    #-----Plot comparison of the expanded vs simplified equations for a-----
 
     p_list = np.linspace(0, 36, 100)
     a_1 = []
@@ -314,7 +308,6 @@ def mathieu():
     plt.plot(p_list, a_1)
     plt.plot(p_list, a_2)
 
-    #plt.rc(usetex = True)
     plt.rcParams['text.usetex'] = True
     plt.plot(p_list, a_2, c='r', label=r'$a = \frac{4(\frac{p\pi}{36})^2 k_0}{w^2 m}$')
     plt.plot(p_list, a_1, c='b', label=r'$a = (\frac {2}{w})^2 2(1 - \cos{\frac{p\pi}{36}}) \frac{k_0}{m} $')
@@ -323,22 +316,11 @@ def mathieu():
     plt.ylabel("w")
     plt.show()
 
-    # import pylab
-    # params = {'backend': 'ps',
-    #       'text.usetex': True}
-    # pylab.rcParams.update(params)
-    # # Plot data
-    # pylab.figure(1)
-    # pylab.clf()
-    # pylab.plot(p_list,a_1,label='$a = \frac {2}{w})^2 2(1 - \cos{\frac{p\pi}{36}}$')
-    # pylab.plot(p_list,a_2,label='$a = \frac{4(\frac{p\pi}{36})^20}{w^2}$')
-    # pylab.xlabel('$p$')
-    # pylab.ylabel('$w$')
-    # pylab.legend()
-    # pylab.savefig('test.png')
-
-
-def data_analysis(data_folder, num_bonds):
+def force_analysis(data_folder, num_bonds):
+    """
+    Function for running various analysis functions on the data for standing
+    wave simulations
+    """
 
     #create folders to store created graphs
     path = os.getcwd() + "/1Dline_analysis"
@@ -370,15 +352,12 @@ def data_analysis(data_folder, num_bonds):
                  force_frequencies.append(force_freq)
              files_kinetic.append(filename)
              continue
-
         #collect position files
         elif filename.startswith("positions"):
             files_positions.append(filename)
-
         #collect velocity files
         elif filename.startswith("velocities"):
             files_velocities.append(filename)
-
         else:
             continue
 
@@ -441,6 +420,10 @@ def data_analysis(data_folder, num_bonds):
     plt.show()
 
 def standing_analysis(data_folder, num_bonds):
+    """
+    Function for running various analysis functions on the data for standing
+    wave simulations
+    """
 
     #location of target files
     data_files_locations = os.getcwd() + f"/{data_folder}/1Dline_{num_bonds}bonds"

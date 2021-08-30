@@ -1,9 +1,10 @@
-"""Molecular Dynamic simulation of a line of three particles bounded by different springs
+"""
+Author - Noah Kruss
 
-how to get to simulations in terminal get to directory where triangle_lattice.py is stored
-    from spring_line import *
+File containing python class for initilizing a Molecular Dynamic simulation
+of a line of n particles bounded by (num_bonds) number of different springs
 
-example:
+Example:
         simulation = Line()
         simulation.create_lattice(10, 10, 10, p_mass=.001)
         simulation.apply_force([0],-10,0,0)
@@ -26,8 +27,10 @@ class Line(Simulation):
                         pos_offsets = [],
                         vel_init = []):
 
-        """Create a snapshot of N particles arranged in a line with bonds connecting each particle to the
-        ones next to it in the line """
+        """
+        Create a snapshot of N particles arranged in a line with bonds
+        connecting each particle to the ones next to it in the line
+        """
 
         self.m = p_mass
         self.a = a

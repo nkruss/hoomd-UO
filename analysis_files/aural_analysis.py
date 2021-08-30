@@ -1,3 +1,11 @@
+"""
+Author - Noah Kruss
+
+File that contains the analysis class with the functions for analysising the
+aural metamaterial system
+"""
+
+#---------------IMPORT STATEMENTS------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -17,10 +25,11 @@ import gsd.hoomd as GSD_hoomd
 from scipy.optimize import curve_fit
 from astropy.modeling import models, fitting
 
-#fit functions
+#---------------Helper Function------------------------------
 def gauss_function(x, a, x0, sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))
 
+#---------------Analysis Class-------------------------------
 class Aural_Analysis():
 
     def __init__(self):
@@ -32,6 +41,12 @@ class Aural_Analysis():
         self.N = None
 
     def read_data(self, fname: str):
+        """
+        Function to read the recorded data from a simulation from a gsd file
+
+        Inputs:
+            fname - (str) name of gsd file containing simulation data
+        """
 
         #open data file
         f = GSD_pygsd.GSDFile(open(fname, 'rb'))
@@ -40,7 +55,67 @@ class Aural_Analysis():
         self.particle_data = t
         self.N = len(t[0].particles.position)
 
-    def wave_packet(self, dt, store_loc = None, plot_title = "Gausian plot", num_samples = 8, target_times = None):
+    def fourier_plot(self, x_data: list, y_data: list, store_loc = None, plot_title = "Fourier_plot"):
+        """
+        Function for ploting and returning the fourier data of a given inputed data set
+        """
+
+        x_data = np.array(x_data)
+        y_data = np.array(y_data)
+
+        fft = np.fft.fft(y_data)
+        fft[0] = 0
+
+        N = len(x_data)
+        T = x_data[1] - x_data[0] # sampling interval
+        freq = np.fft.fftfreq(N, d=T)
+
+        plt.plot(abs(freq), abs(fft.real))
+        plt.ylabel("Amplitude")
+        plt.xlabel("Frequency [1 / wave-length]")
+
+        #find peak of graph
+        decreasing = True
+        peak = None
+        for value_i in range(len(x_data)):
+            amp = fft[value_i]
+            frequency = freq[value_i]
+
+            if peak == None:
+                peak = (frequency, amp)
+            elif decreasing == True and peak[1] < amp:
+                decreasing = False
+            elif decreasing == True:
+                peak = (frequency, amp)
+            elif decreasing == False and amp > peak[1]:
+                peak = (frequency, amp)
+
+        plt.title(f"{plot_title}\nPeak at {peak[0]} Hz")
+
+        plt.savefig(plot_title)
+        if store_loc != None:
+            shutil.move(f"{plot_title}.png", store_loc)
+        plt.clf()
+
+        return (abs(freq), abs(fft.real))
+
+    def wave_packet(self, dt, store_loc = None, plot_title = "Waterfall plot", num_samples = 8, target_times = None):
+        """
+        Function for generating and saving a waterfall plot of the system
+        standing wave over the course of the simulation along with prefroming
+        a fourier transform at each targeted time snapshot
+
+        Inputs:
+            dt - (float) the amount of time of a timestep
+            store_loc - (str) path to directory to store generated plot (if left
+                        as None then waterfall plot will be shown not saved)
+            plot_title - (str) name for the waterfall plot
+            num_samples - (int) option for the number of time shapshots to display
+                          in the waterfall plot
+            target_times - (list) list of specific timesteps to display in the
+                           waterfall plot. Will override the num_samples property
+                           if set to non-None
+        """
 
         target_index = []
         if target_times == None:
@@ -143,7 +218,19 @@ class Aural_Analysis():
             fourier_data_list.append(fourier_data)
 
 
-    def gaussian_fitting(self, dt, store_loc = None, plot_title = "Gausian plot", num_samples = 8, target_times = None):
+    def gaussian_fitting(self, dt, store_loc = None, num_samples = 8, target_times = None):
+        """
+        Function for generating and saving xlsx file of the gaussian fit
+        parameters for the system standing wave over the course of the simulation
+
+        Inputs:
+            dt - (float) the amount of time of a timestep
+            store_loc - (str) path to directory to store generated data file
+                        (if left as None then the plot will be shown not saved)
+            num_samples - (int) option for the number of time shapshots to analyse
+            target_times - (list) list of specific timesteps to analyse. Will
+                            override the num_samples property if set to non-None
+        """
 
         dimensionless_time = []
         w = 0.7853981633974483
@@ -272,17 +359,9 @@ class Aural_Analysis():
                     unwrap_counter += 1;
             fit_cent_list.append(abs_offsets.index(amp1 + shift) + (unwrap_counter * self.N))
 
-            # print(f"{time_step} - ({gausian_left_index}, {gausian_right_index}), {popt_gauss[0]}, {popt_gauss[2]}")
-            # plt.plot(p_list, gauss_function(p_list, *popt_gauss) + shift, color = "r")
-            # plt.plot(p_list, abs_offsets, color = "g")
-
-            # shift -= .5
             shift -= .175
 
         if store_loc != None:
-            plt.savefig("Gaussian_Fits")
-            shutil.move("Gaussian_Fits.png", store_loc)
-
             df = pd.DataFrame({"Dimensionless Time": dimensionless_time, "Amplitude": fit_amp_list, "STD": fit_std_list, "Center": fit_cent_list})
             df.to_excel("gaussian_fit_parameters.xlsx")
             shutil.move("gaussian_fit_parameters.xlsx", store_loc)
@@ -290,14 +369,7 @@ class Aural_Analysis():
             plt.show()
         plt.clf()
 
-        # df = pd.DataFrame(fit_amp_list)
-        # df_2 = pd.DataFrame(fit_std_list)
-        # df_3 = pd.DataFrame(fit_cent_list)
-        # with pd.ExcelWriter("gausian_fit_parameters.xlsx") as writer:
-        #     df.to_excel(writer, sheet_name = "Amp")
-        #     df_2.to_excel(writer, sheet_name = "STD")
-        #     df_3.to_excel(writer, sheet_name = "Center")
-        # shutil.move("gausian_fit_parameters.xlsx", store_loc)
+        #-------------Collect Fit Error------------------------
 
         #get fit parameter errors
         amp_perc_error_list = []
@@ -346,129 +418,21 @@ class Aural_Analysis():
         m, b = np.polyfit(dimensionless_time, fit_cent_list, 1)
         return(dimensionless_time, fit_cent_list, m, b, amp_perc_error_list)
 
-
-    def fourier_plot(self, x_data: list, y_data: list, store_loc = None, plot_title = "Fourier_plot"):
-        """
-        Function for ploting and returning the fourier data of a given inputed data set
-        """
-
-        x_data = np.array(x_data)
-        y_data = np.array(y_data)
-
-        fft = np.fft.fft(y_data)
-        fft[0] = 0
-
-        N = len(x_data)
-        T = x_data[1] - x_data[0] # sampling interval
-        freq = np.fft.fftfreq(N, d=T)
-
-        plt.plot(abs(freq), abs(fft.real))
-        plt.ylabel("Amplitude")
-        plt.xlabel("Frequency [1 / wave-length]")
-
-        #find peak of graph
-        decreasing = True
-        peak = None
-        for value_i in range(len(x_data)):
-            amp = fft[value_i]
-            frequency = freq[value_i]
-
-            if peak == None:
-                peak = (frequency, amp)
-            elif decreasing == True and peak[1] < amp:
-                decreasing = False
-            elif decreasing == True:
-                peak = (frequency, amp)
-            elif decreasing == False and amp > peak[1]:
-                peak = (frequency, amp)
-
-        plt.title(f"{plot_title}\nPeak at {peak[0]} Hz")
-
-        plt.savefig(plot_title)
-        if store_loc != None:
-            shutil.move(f"{plot_title}.png", store_loc)
-        plt.clf()
-
-        return (abs(freq), abs(fft.real))
-
-    def RMS_error(self, dt, store_loc = None, plot_title = "Root Mean Squared Error", num_samples = 1000, target_times = None):
-
-        dimensionless_time = []
-        timesteps = []
-        realtimes = []
-        w = 0.7853981633974483
-
-        target_index = []
-        if target_times == None:
-            #select the time to plot the data at
-            sample_period = (100000000) / num_samples
-
-            for time_step_i in range(len(self.particle_data)):
-                time_step = time_step_i * 500
-                if time_step % sample_period == 0:
-                    target_index.append(time_step_i)
-                    dimensionless_time.append(time_step * w)
-                    timesteps.append(time_step)
-                    realtimes.append(time_step * .0001)
-            target_index.append(len(self.particle_data) - 1)
-            dimensionless_time.append((len(self.particle_data) - 1) * 500 * w)
-            timesteps.append((len(self.particle_data) - 1) * 500)
-        else:
-            for time_step_i in range(len(self.particle_data)):
-                time_step = time_step_i * 500
-                time = time_step * dt
-                if (time in target_times):
-                    target_index.append(time_step_i)
-                    dimensionless_time.append(time_step * w)
-                    timesteps.append(time_step)
-                    realtimes.append(time_step * dt)
-
-        #get fourier plot and data for either sample
-        fourier_data_list = []
-        for i in target_index:
-            time_step = i * 500
-            p_list = []
-            offsets = []
-            gausian = []
-            for p_index in range(self.N):
-                equilibriam_pos = (-self.N / 2) + p_index
-                position = self.particle_data[i].particles.position[p_index][0] - equilibriam_pos
-
-                #check for particle 0 looping around due to boundery conditions
-                if p_index == 0:
-                    if self.particle_data[i].particles.position[p_index][0] > 0:
-                        position = -self.particle_data[i].particles.position[p_index][0] - equilibriam_pos
-
-                p_list.append(p_index)
-                offsets.append(position)
-                gausian.append(abs(position))
-
-            #plt.plot(p_list, gausian)
-            fourier_data = self.fourier_plot(p_list, offsets)
-            fourier_data_list.append(fourier_data)
-
-        #-----------------------------------------------------------------------
-        mean_squared_error_list = []
-        initial_data = fourier_data_list[0]
-        for fourier_data in fourier_data_list:
-            diff_sqrd_sum = 0
-            for i in range(len(fourier_data[0])):
-                diff_sqrd_sum += ((initial_data[1][i] - fourier_data[1][i]) ** 2)
-            mean_squared_error_list.append(math.sqrt(diff_sqrd_sum / len(fourier_data[0])))
-
-        error_plot_title = "RMS Error - (over course of Simulation)"
-        plt.plot(dimensionless_time, mean_squared_error_list)
-        plt.title(plot_title, fontsize = 7)
-        plt.savefig(error_plot_title)
-        if store_loc != None:
-            shutil.move(f"{error_plot_title}.png", store_loc)
-        plt.clf()
-
-        df = pd.DataFrame(mean_squared_error_list)
-        df.to_excel("RMSE.xlsx")
-        shutil.move("RMSE.xlsx", store_loc)
-
     def peak_error(self, dt, store_loc = None, plot_title = "Mean Peak Error", num_samples = 10, target_times = None):
+        """
+        Function for calculating the error in the position of the peaks of the
+        fourier transform of the system standing wave over the course of the
+        simulation
+
+        Inputs:
+            dt - (float) the amount of time of a timestep
+            store_loc - (str) path to directory to store generated data file
+                        (if left as None then the plot will be shown not saved)
+            plot_title - (str) name for the generated plot
+            num_samples - (int) option for the number of time shapshots to analyse
+            target_times - (list) list of specific timesteps to analyse. Will
+                            override the num_samples property if set to non-None
+        """
 
         dimensionless_time = []
         w = 0.7853981633974483
@@ -550,17 +514,25 @@ class Aural_Analysis():
             shutil.move(f"{error_plot_title}.png", store_loc)
         plt.clf()
 
-        # #code for printing the peak points
-        # plt.plot(fourier_data_list[0][0], fourier_data_list[0][1])
-        # height = peaks_initial[1]['peak_heights']
-        # peak_pos = fourier_data_list[0][0][peaks_initial[0]]
-        # plt.scatter(peak_pos, height)
-
+        #save peak error to spreadsheet
         df = pd.DataFrame(mean_peak_error_list)
         df.to_excel("Peak_pos.xlsx")
         shutil.move("Peak_pos.xlsx", store_loc)
 
     def normalized_error(self, dt, store_loc = None, plot_title = "Normalized Amplitude Error", num_samples = 1000, target_times = None):
+        """
+        Function for calculating the error in the amplitude of the system
+        standing wave over the course of the simulation
+
+        Inputs:
+            dt - (float) the amount of time of a timestep
+            store_loc - (str) path to directory to store generated data file
+                        (if left as None then the plot will be shown not saved)
+            plot_title - (str) name for the generated plot
+            num_samples - (int) option for the number of time shapshots to analyse
+            target_times - (list) list of specific timesteps to analyse. Will
+                            override the num_samples property if set to non-None
+        """
 
         dimensionless_time = []
         w = 0.7853981633974483

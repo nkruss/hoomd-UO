@@ -1,7 +1,7 @@
 """
 Author - Noah Kruss
 
-Functions for running the aural_metamaterial simulations
+Functions for running the aural metamaterial simulations
 """
 
 #---------------IMPORT STATEMENTS------------------------------
@@ -26,8 +26,9 @@ def run_sim(num_bonds: int, condition_name: str):
 
     Inputs:
         num_bonds - number of bonds within the unit cell of the spring mass chain
-        condition_name - name of directory within initial_condition folder in
-                         aural_metamaterial directory with the inital position
+        condition_name - name of directory within 'initial_condition' folder in
+                         'aural_metamaterial' directory with files 'InitPos.txt'
+                         and 'InitVel.txt that contiain the inital position
                          and velocity values of the spring-mass chain
 
     """
@@ -185,21 +186,126 @@ def gsd_analysis(dir_name, dt = 0.0001):
 
     # #target times
     target_times = [0.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0, 7000.0, 8000.0, 9000.0, 9999.95]
-    # data.wave_packet(dt, store_loc = path, plot_title = waterfall_plot_title, num_samples = 10, target_times = target_times)
-    # data.RMS_error(dt, store_loc = path, plot_title = mean_error_plot_title, num_samples = 10, target_times = target_times)
-    # data.fractional_error(dt, store_loc = path, plot_title = fractional_error_plot_title, num_samples = 10, target_times = target_times)
-    # data.peak_error(dt, store_loc = path, num_samples = 10, target_times = target_times)
 
-    #target times
-    #target_times = [0.0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400]
-    #target_times = [0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 35]
+    #analysis functions
     data.wave_packet(dt, store_loc = path, plot_title = waterfall_plot_title, num_samples = 10, target_times = target_times)
-    #data.gaussian_fitting(dt, store_loc = path, num_samples = 1000, target_times = target_times)
     data.gaussian_fitting(dt, store_loc = path, num_samples = 1000)
-    #data.RMS_error(dt, store_loc = path, plot_title = mean_error_plot_title, num_samples = 1000)
     data.normalized_error(dt, store_loc = path, plot_title = normalized_error_plot_title, num_samples = 1000)
-    print("---")
     #data.peak_error(dt, store_loc = path, num_samples = 1000)
+    print("---")
+
+def Gaussian_center_fit_analysis(dt = 0.0001):
+    """
+    Function for generating a plot of the fit (center and amplitude) error
+    from gaussian fitting the system wave packet of various simulation trials
+    """
+
+    try:
+        os.remove(os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Center_All_Data.png")
+        os.remove(os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Amp_All_Data.png")
+    except:
+        pass
+
+    #list of ddirectories for the simulations to run analysis on
+    dir_list = ["static_bonds",
+                "8bonds_damp_pt019",
+                "8bonds_damp_pt019175",
+                "8bonds_damp_pt0192",
+                "8bonds_damp_pt01925",
+                "8bonds_damp_pt02"]
+    #lists containing data to be used for plot of all data
+    label_list = ["Static",
+                  "0.019000",
+                  "0.019175",
+                  "0.019200",
+                  "0.019250",
+                  "0.020000"]
+    dash_list = [[1,0],
+                [6,1],
+                [3,1],
+                [1,1],
+                [3,4],
+                [6,4]]
+
+    gaussian_results = []
+    xs = []
+    ys = []
+    yints = []
+
+    #loop through each simulation directoy to preform analysis
+    for dir_name in dir_list:
+
+        #create folders to store created graphs
+        data_files_locations = os.getcwd() + f"/aural_metamaterial/{dir_name}"
+        path = data_files_locations + "/analysis"
+        try:
+            shutil.rmtree(path)
+        except:
+            pass
+        os.mkdir(path, 0o755)
+
+        #get data files
+        for file in sorted(os.listdir(data_files_locations)):
+            filename = os.fsdecode(file)
+
+            #collect kinetic energy files and record force frequencies
+            if filename.startswith("kinetic"):
+                 kinetic_file = filename
+
+            #collect run condition file
+            elif filename.startswith("run"):
+                cond_file = data_files_locations + '/' + filename
+
+            #collect run condition file
+            elif filename.startswith("line"):
+                gsd_file = data_files_locations + '/' + filename
+
+        with open(cond_file, "r") as f:
+            time_cond = f.readline().strip()
+            spring_cond = f.readline().strip()
+            damp_cond = f.readline().strip()
+            f.close()
+
+        #preform analysis
+        data = Aural_Analysis()
+        data.read_data(gsd_file)
+
+        gaussian_data = data.gaussian_fitting(dt, store_loc = path, num_samples = 1000)
+
+        gaussian_results.append(gaussian_data)
+        xs.append(gaussian_data[0])
+        ys.append(gaussian_data[4])
+        yints.append(gaussian_data[4][500])
+
+    #plot all center data
+    g = plt.figure(1)
+    plt.clf()
+    plt.xlabel('Dimensionless Time')
+    plt.ylabel('Center Position')
+    plt.title("Gaussian Fit Center Position")
+    for i in range(len(gaussian_results)):
+        data = gaussian_results[i]
+        plt.plot(data[0], data[1], label=label_list[i])
+        print(f"{dir_list[i]}, speed = {data[2]}")
+    plt.legend()
+    plt.savefig("Gaussian_Fit_Center_All_Data")
+    shutil.move("Gaussian_Fit_Center_All_Data.png", os.getcwd() + f"/aural_metamaterial")
+
+    #plot all amp data
+    plt.clf()
+    plt.xlabel('Time')
+    plt.ylabel('Fit Amplitude Factor')
+    plt.title("Gaussian Fitting Amplitude Factor")
+
+    cmap = plt.get_cmap('winter')
+    yints = np.asarray(yints)
+    for x, y, color, label, dash in zip(xs, ys, normalize(yints), label_list, dash_list):
+        plt.plot(x, y, label=label, color=cmap(color), dashes=dash)
+
+    plt.legend(loc = 'upper left', fontsize = 9)
+    #plt.figure(figsize=fig_size)
+    plt.save('Gaussian_Fit_Amp_All_Data.pdf')
+    shutil.move("Gaussian_Fit_Amp_All_Data.pdf", os.getcwd() + f"/aural_metamaterial")
 
 def integrety_analysis(dir_name, dt = 0.0001):
 
@@ -252,10 +358,6 @@ def integrety_analysis(dir_name, dt = 0.0001):
     static_data = Aural_Analysis()
     static_data.read_data(static_gsd_file)
 
-    #calculate integrety values
-    # run_integrety_data = data.integrety_test(dt, num_samples = 10, target_times = target_times)
-    # baseline_integrety_data = static_data.integrety_test(dt, num_samples = 10, target_times = target_times)
-
     run_integrety_data = data.normalized_error(dt, num_samples = 1000)
     baseline_integrety_data = static_data.normalized_error(dt, num_samples = 1000)
     integrety_value_list = []
@@ -264,9 +366,6 @@ def integrety_analysis(dir_name, dt = 0.0001):
         integrety_value = abs(run_integrety_data[0][i] - baseline_integrety_data[0][i])
         integrety_value_list.append(integrety_value)
 
-    # print("integrety_value_list")
-    # print(integrety_value_list)
-
     #plot integrety values
     plot_title = "Wave Packet Integrety - (over course of Simulation)"
     plt.plot(run_integrety_data[1], integrety_value_list)
@@ -274,125 +373,3 @@ def integrety_analysis(dir_name, dt = 0.0001):
     plt.savefig(plot_title)
     shutil.move(f"{plot_title}.png", path)
     plt.clf()
-
-def Gaussian_center_fit_analysis(dt = 0.0001):
-
-    try:
-        os.remove(os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Center_All_Data.png")
-        os.remove(os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Amp_All_Data.png")
-    except:
-        pass
-
-    dir_list = ["static_bonds",
-                "8bonds_damp_pt019",
-                "8bonds_damp_pt019175",
-                "8bonds_damp_pt0192",
-                "8bonds_damp_pt01925",
-                "8bonds_damp_pt02"]
-    label_list = ["Static",
-                  "0.019000",
-                  "0.019175",
-                  "0.019200",
-                  "0.019250",
-                  "0.020000"]
-    dash_list = [[1,0],
-                [6,1],
-                [3,1],
-                [1,1],
-                [3,4],
-                [6,4]]
-
-    gaussian_results = []
-    xs = []
-    ys = []
-    yints = []
-
-    for dir_name in dir_list:
-
-        #create folders to store created graphs
-        data_files_locations = os.getcwd() + f"/aural_metamaterial/{dir_name}"
-        path = data_files_locations + "/analysis"
-        try:
-            shutil.rmtree(path)
-        except:
-            pass
-        os.mkdir(path, 0o755)
-
-        #get data files
-        for file in sorted(os.listdir(data_files_locations)):
-            filename = os.fsdecode(file)
-
-            #collect kinetic energy files and record force frequencies
-            if filename.startswith("kinetic"):
-                 kinetic_file = filename
-
-            #collect position files
-            elif filename.startswith("positions"):
-                pos_file = filename
-
-            #collect velocity files
-            elif filename.startswith("velocities"):
-                vel_file = filename
-
-            #collect run condition file
-            elif filename.startswith("run"):
-                cond_file = data_files_locations + '/' + filename
-
-            #collect run condition file
-            elif filename.startswith("line"):
-                gsd_file = data_files_locations + '/' + filename
-
-        with open(cond_file, "r") as f:
-            time_cond = f.readline().strip()
-            spring_cond = f.readline().strip()
-            damp_cond = f.readline().strip()
-            f.close()
-
-        data = Aural_Analysis()
-        data.read_data(gsd_file)
-
-        target_times = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0]
-        waterfall_plot_title = f"Gaussian Plot\n{damp_cond}\n{spring_cond}\n"
-        data.wave_packet(dt, store_loc = path, plot_title = waterfall_plot_title, target_times = target_times)
-
-        gaussian_data = data.gaussian_fitting(dt, store_loc = path, num_samples = 1000)
-        gaussian_results.append(gaussian_data)
-        #plt.plot(center_data[0], np.unwrap(center_data[1]))
-
-        xs.append(gaussian_data[0])
-        ys.append(gaussian_data[4])
-        yints.append(gaussian_data[4][500])
-
-    #plot all center data
-    g = plt.figure(1)
-    plt.clf()
-    plt.xlabel('Dimensionless Time')
-    plt.ylabel('Center Position')
-    plt.title("Gaussian Fit Center Position")
-    for i in range(len(gaussian_results)):
-        data = gaussian_results[i]
-        plt.plot(data[0], data[1], label=label_list[i])
-        print(f"{dir_list[i]}, speed = {data[2]}")
-    plt.legend()
-    plt.savefig("Gaussian_Fit_Center_All_Data")
-    shutil.move("Gaussian_Fit_Center_All_Data.png", os.getcwd() + f"/aural_metamaterial")
-
-    #plot all amp data
-    plt.clf()
-    plt.xlabel('Time')
-    plt.ylabel('Fit Amplitude Factor')
-    plt.title("Gaussian Fitting Amplitude Factor")
-
-    #plot static trial
-    # data = gaussian_results[0]
-    # plt.plot(data[0], data[4], c = "k", label=label_list[i])
-
-    cmap = plt.get_cmap('winter')
-    yints = np.asarray(yints)
-    for x, y, color, label, dash in zip(xs, ys, normalize(yints), label_list, dash_list):
-        plt.plot(x, y, label=label, color=cmap(color), dashes=dash)
-
-    plt.legend(loc = 'upper left', fontsize = 9)
-    #plt.figure(figsize=fig_size)
-    plt.save('Gaussian_Fit_Amp_All_Data.pdf')
-    shutil.move("Gaussian_Fit_Amp_All_Data.pdf", os.getcwd() + f"/aural_metamaterial")

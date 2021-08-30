@@ -1,4 +1,11 @@
-from aural_analysis import *
+"""
+Author - Noah Kruss
+
+File that contains functions for creating the final figures for the Aural
+metamaterial paper
+"""
+
+#---------------IMPORT STATEMENTS------------------------------
 import matplotlib
 matplotlib.use('PDF')
 import matplotlib.pyplot as plt
@@ -7,16 +14,15 @@ from matplotlib import ticker
 import numpy as np
 import os
 import shutil
+import sys
 
+from analysis_files.aural_analysis import *
 
 #------------------Set Figure Parameters---------------------------
 fig_width = 3.46  # width in inches : 85 mm one-column format
 fig_height = fig_width*3./4.      # height in inches
 fig_size =  (fig_width,fig_height)
 params = {
-            #~ 'backend': 'PDF',
-
-
           'axes.labelsize': 9,
           'axes.labelpad':1,
           'axes.linewidth':.1,
@@ -68,6 +74,10 @@ def normalize(z):
 
 #-------------------Figure Creation Functions--------------------------------
 def gaussian_fiting_amp_analysis(dt = 0.0001):
+    """
+    Function for generating a plot of the fit amplitude error
+    from gaussian fitting the system wave packet of various simulation trials
+    """
 
     try:
         os.remove(os.getcwd() + "/aural_metamaterial/Gaussian_Fit_Amp_All_Data.pdf")
@@ -115,14 +125,6 @@ def gaussian_fiting_amp_analysis(dt = 0.0001):
             #collect kinetic energy files and record force frequencies
             if filename.startswith("kinetic"):
                  kinetic_file = filename
-
-            #collect position files
-            elif filename.startswith("positions"):
-                pos_file = filename
-
-            #collect velocity files
-            elif filename.startswith("velocities"):
-                vel_file = filename
 
             #collect run condition file
             elif filename.startswith("run"):
