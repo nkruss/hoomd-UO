@@ -191,7 +191,7 @@ def analysis_data(force_mag: int):
 
 def pinch_data_analysis(data_folder_name: str):
     """
-    filename - name of folder where position files are stored
+    data_folder_name - name of folder where position files are stored
     """
     #create folders to store created graphs
     path = os.getcwd() + "/pinch_analysis"

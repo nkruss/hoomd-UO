@@ -1,20 +1,27 @@
+#---------------IMPORT STATEMENTS------------------------------
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+import os
+import shutil
+from analysis import *
+
+sys.path.append('./../simulation_files')
+from Equations import *
 from triangular_lattice import *
 from spring_line import *
 from random_line import *
 from line_force import *
 from two_mass_rand import *
 from three_mass_rand import *
-from analysis import *
-from Equations import *
 from triangular_lattice_2 import *
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
-import os
-import shutil
+sys.path.append('./../sandbox')
 
-
+#---------------Function to Run Simulation---------------------
 def tri_lattice_force_in_y():
-    #Opossing forces in center of the lattice
+    """
+    Function to run a simulation of a triangular lattice of 3 springs with
+    opposing forces in the center of the lattice pushing out in the y dimension
+    """
 
     dim_lattice = 10
     sim = Tri_Lattice()
@@ -30,6 +37,7 @@ def tri_lattice_force_in_y():
     sim.create_animation("dump1_dynamic")
     sim.log_system_kinetic_energy("kinetic.txt")
 
+    # #code for identifing the indexes of the edge particles of the lattice
     # edge_particle_list = []
     # for i in range(1, (2 * dim_lattice), 2):
     #     edge_particle_list.append(i)
@@ -43,38 +51,26 @@ def tri_lattice_force_in_y():
     #
     # print(edge_particle_list)
 
-    # equations = get_spring_equations(1, .5, .75, [(2 * math.pi / 3.0), (4 * math.pi / 3.0), 0])
-    # for equation_i in range(len(equations)):
-    #     sim.change_spring_eq(equation_i, equations[equation_i])
-
-    #sim.run_langevin(1000000,callback=sim.log_p_info,gamma=1.0, callback_period=500, quiet=True)
-    sim.run_langevin(1000000,callback=sim.log_p_info,gamma=.05, callback_period=500, quiet=True, dynamic_f_stop=1000000)
-
-    # data = Analysis()
-    # data.read_pos("positions.txt")
-    # data.read_velocity("velocities.txt")
-    # data.read_kinetic("kinetic.txt")
-    # title = "test dynamic, runtime=500000"
-    # #title = "test dynamic"
-    # data.heat_map(title)
-
-def callback_test():
-    sim = Line()
-    sim.create_lattice(100,100,100, a=.5)
-    # sim.apply_static_force([2], 100, 0, 0)
-    #sim.pin_particles([0])
-    sim.create_animation("callback_test")
-    #sim.log_velocity()
-    equations = get_spring_equations(100, 50, .75, [(2 * math.pi / 3.0), (4 * math.pi / 3.0), 0])
+    equations = get_spring_equations(1, .5, .75, [(2 * math.pi / 3.0), (4 * math.pi / 3.0), 0])
     for equation_i in range(len(equations)):
         sim.change_spring_eq(equation_i, equations[equation_i])
-    #sim.run2(50000, callback=sim.update_dynamic_properties, callback_period=1)
-    sim.run(50000, callback=sim.log_p_info, callback_period=1)
+
+    #sim.run_langevin(1000000,callback=sim.log_p_info,gamma=1.0, callback_period=500, quiet=True)
+    sim.run_langevin(1000000,callback=sim.log_p_info, gamma=.05, callback_period=500, quiet=True, dynamic_f_stop=1000000)
 
     data = Analysis()
+    data.read_pos("positions.txt")
+    data.read_velocity("velocities.txt")
+    data.read_kinetic("kinetic.txt")
+    title = "test dynamic, runtime=1000000"
+    data.heat_map(title)
 
 
 def random_line(n: int, Nk=15, Nw=100, spring_const=4000):
+    """
+    Function for project with Nathan Villager. Function creates a simulation of
+    a 1D line with the particles offset by their equilibrium positions by
+    """
     SED = np.zeros((Nk,Nw,n))
     cb = 100
     for i in range(n):

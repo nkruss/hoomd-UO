@@ -6,6 +6,10 @@ import numpy as np
 class Three_Mass_Rand_Line(Simulation,Spring_Eq):
 
     def create_lattice(self, k1: int, k2: int, k3: int, p_mass1: int, p_mass2: int, p_mass3: int, N=78, a=1):
+        """
+        Creates a snapshot of a 1D spring mass chain with three types of dynamic
+        springs and 3 different particle masses
+        """
 
         self.k1 = k1
         self.k2 = k2

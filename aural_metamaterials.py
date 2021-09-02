@@ -121,7 +121,6 @@ def gsd_multi_analysis():
                 "8bonds_damp_pt0195", "8bonds_damp_pt0195_dt_pt00025", "8bonds_damp_pt0195_dt_pt0005",
                 ]
 
-    #
     count = 0
     for dir_name in dir_list:
         if count in [0, 3, 6]:
@@ -134,7 +133,10 @@ def gsd_multi_analysis():
         count += 1
 
 
-def gsd_analysis(dir_name, dt = 0.0001):
+def simulation_analysis(dir_name, dt = 0.0001):
+    """
+    Function for preforming various analysis functions on simulation data
+    """
 
     #create folders to store created graphs
     data_files_locations = os.getcwd() + f"/aural_metamaterial/{dir_name}"
@@ -152,14 +154,6 @@ def gsd_analysis(dir_name, dt = 0.0001):
         #collect kinetic energy files and record force frequencies
         if filename.startswith("kinetic"):
              kinetic_file = filename
-
-        #collect position files
-        elif filename.startswith("positions"):
-            pos_file = filename
-
-        #collect velocity files
-        elif filename.startswith("velocities"):
-            vel_file = filename
 
         #collect run condition file
         elif filename.startswith("run"):

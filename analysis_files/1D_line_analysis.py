@@ -15,6 +15,7 @@ import statistics as stats
 import scipy.signal
 import scipy.special
 
+#---------------Analysis Class-------------------------------
 class Analysis():
 
     def __init__(self):
@@ -27,18 +28,16 @@ class Analysis():
         self.dt = None
         self.m = None
         self.N = None
-        self.kspace_vec = None
-        self.wspace_vec = None
         self.kinetic_energy = []
-        self.dynamic_frequencies = []
-        self.spring_frequencies = []
         self.average_kinetic = []
-        self.spring_frequency = None
 
     # Read Functions
     def read_pos(self, fname: str):
-        """Read through a simulation position file and record all of the particle
-        positions into a dictionary of tuples and store the simulation paramaters as analysis object porperties"""
+        """
+        Read through a simulation position file and record all of the particle
+        positions into a dictionary of tuples and store the simulation paramaters
+        as analysis object porperties
+        """
 
         #open the position file
         with open(fname, "r") as f:
@@ -79,9 +78,11 @@ class Analysis():
         f.close()
 
     def read_velocity(self, fname: str):
-        """Read through a simulation velocity file and record all of the particle
+        """
+        Read through a simulation velocity file and record all of the particle
         multi-dimensional velociy components into a dictionary of tuples and
-        store the simulation paramaters as analysis object porperties"""
+        store the simulation paramaters as analysis object porperties
+        """
 
         with open(fname, "r") as f:
             self.time = []
@@ -114,8 +115,10 @@ class Analysis():
         f.close()
 
     def read_kinetic(self, fname: str):
-        """Read through a simulation kinetic energy file and record all of
-        the enrgy magnitudes into a list"""
+        """
+        Read through a simulation kinetic energy file and record all of
+        the enrgy magnitudes into a list
+        """
 
         run_num = len(self.kinetic_energy)
         with open(fname, "r") as f:
@@ -177,13 +180,16 @@ class Analysis():
         plt.clf()
 
     def graph_spring_line_particle_kinetic(self, plot_title, store_loc):
+        """
+        Function for plotting the kinetic energy within the spring mass chain by
+        individual particle, and plotting the fourier transform of the system
+        along with recording the peak location of the foureir transform
+        """
         E_k_list = []
 
         for p_i in range(self.N-1):
 
             current_E = []
-
-            #for time_i in range(self.stabalization_step, len(self.time)):
             for time_i in range(int(1500000 / 500), len(self.time)):
 
                 velocity = self.particle_v[p_i][time_i]
@@ -192,7 +198,6 @@ class Analysis():
 
             avg_E = stats.mean(current_E)
 
-            #E_k_list.append(math.log(avg_E))
             E_k_list.append(avg_E)
 
         plt.plot(E_k_list)
@@ -203,8 +208,6 @@ class Analysis():
         string = plot_title.split(' ')
         force_freq = string[8].split('.')
         force_freq = force_freq[0] + "pt" + force_freq[1]
-        # if string[8] == "0.1":
-        #     pass
         if string[4] == "0,":
             save_title = f"1Dline_static_bonds_{force_freq}_forcefreq"
         else:
@@ -216,8 +219,7 @@ class Analysis():
         plt.show()
         plt.clf()
 
-
-        #fourier transform
+        #---------fourier transform----------------------
         N = self.N - 100
         t = np.arange(100, self.N)
         fft = np.fft.fft(E_k_list[100:])
@@ -225,7 +227,6 @@ class Analysis():
         f = np.linspace(0, 1 / T, N)
         plt.ylabel("Amplitude")
         plt.xlabel("Frequency [Hz]")
-        #plt.plot(f[:N // 2], np.abs(fft)[:N // 2] * 1 / N)
 
         for value_i in range(len(np.abs(fft)[:N // 2] * 1 / N)):
             (np.abs(fft)[:N // 2] * 1 / N)[value_i] = math.log((np.abs(fft)[:N // 2] * 1 / N)[value_i])
@@ -311,7 +312,6 @@ class Analysis():
                 elif num_bonds == 1:
                     z = w / 2 * time
                     z_time.append(z)
-                    #theoretical.append(scipy.special.mathieu_cem(1, q, z)[0] - (float(self.N) / 2) + particle_i)
                     theoretical.append(0 - (float(self.N) / 2) + particle_i)
 
                 #get strobed data
@@ -324,12 +324,11 @@ class Analysis():
             p_i = []
             for position in self.particle_p[particle_i]:
                 p_i.append(position[0])
-                #p_i.append(math.log10(abs(position[0] - (float(self.N) / 2) + particle_i)))
 
             #create position plot
             if p == particle_i:
                 g1 = plt.figure(1)
-                #plt.xlabel('time')
+
                 if num_bonds == 0:
                     plt.plot(realtime, theoretical)
                     plt.plot(realtime, p_i, "b")
@@ -338,14 +337,11 @@ class Analysis():
                     plt.plot(z_time, p_i, "b")
                     plt.xlabel('z')
                 plt.ylabel('position')
-                #plt.semilogy(z_time, p_i)
-                # plt.scatter(strob_time, strob_pos, color = 'r')
+
                 plt.title(f"p: {p}, particle: {particle_i}")
                 save_title = f"Position_plot_p_{int(p)}_Particle_{particle_i}"
                 plt.savefig(save_title)
                 shutil.move(current_loc + "/" + save_title + ".png", save_loc)
-                # if p == 32:
-                #     plt.show()
                 plt.clf()
 
             #--------------------------------------
